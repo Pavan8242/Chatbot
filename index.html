@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Interactive AI Chatbot</title>
+    <title>AI Chatbot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -73,7 +73,7 @@
         <!-- Header -->
         <div class="p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold text-gray-800">Generative AI Chatbot</h1>
+                <h1 class="text-2xl font-bold text-gray-800">AI Chatbot</h1>
                 <p class="text-sm text-gray-500">Powered by Gemini</p>
             </div>
             <!-- 2D Interactive Bot Face Container -->
@@ -115,7 +115,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-600"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c.251.023.501.05.75.082m.75.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M21 19.5h-5.25m-7.5 0H3M15 21a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
                 <div class="bg-gray-100 p-4 rounded-xl max-w-lg">
-                    <p class="text-gray-700">Hello! I'm a generative AI chatbot. How can I help you today?</p>
+                    <p class="text-gray-700">Hello! I'm an AI chatbot. How can I help you today?</p>
                 </div>
             </div>
         </div>
@@ -137,17 +137,15 @@
         const messagesContainer = document.getElementById('chatbot-messages');
         const botFace = document.getElementById('bot-face');
         
-        // --- State Management ---
         let expressionTimeout;
         let blinkTimeout;
         const expressions = ['idle', 'wink', 'smile'];
-        let chatHistory = []; // Array to store conversation history
+        let chatHistory = [];
 
         function setBotState(state) {
             botFace.className.baseVal = state;
         }
 
-        // --- Animations ---
         function changeExpression() {
             const randomExpression = expressions[Math.floor(Math.random() * expressions.length)];
             setBotState(randomExpression);
@@ -171,7 +169,6 @@
             blinkTimeout = setTimeout(randomBlink, Math.random() * 4000 + 2000);
         }
 
-        // --- Chat Logic ---
         function addUserMessage(message) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('flex', 'items-start', 'gap-4', 'justify-end');
@@ -246,42 +243,42 @@
                 return;
             }
             addUserMessage(message);
-            chatHistory.push({ role: "user", parts: [{ text: message }] }); // Add user message to history
+            chatHistory.push({ role: "user", parts: [{ text: message }] });
             userInput.value = '';
             showTypingIndicator();
 
             try {
-                const payload = { contents: chatHistory }; // Send the entire history
-                const apiKey = "";
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const apiUrl = `/.netlify/functions/gemini`; 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ history: chatHistory }) 
                 });
                 
-                if (!response.ok) {
-                    throw new Error(`API request failed with status ${response.status}`);
-                }
-
                 const result = await response.json();
                 removeTypingIndicator();
-                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
-                    const botResponse = result.candidates[0].content.parts[0].text;
+
+                if (!response.ok) {
+                    // If the server returned an error, 'result.error' should contain the message
+                    throw new Error(result.error || `API request failed with status ${response.status}`);
+                }
+
+                if (result.text) {
+                    const botResponse = result.text;
                     addBotMessage(botResponse);
-                    chatHistory.push({ role: "model", parts: [{ text: botResponse }] }); // Add bot response to history
+                    chatHistory.push({ role: "model", parts: [{ text: botResponse }] });
                 } else {
                     addBotMessage("I'm sorry, I couldn't generate a response.");
                     console.error("Unexpected API response structure:", result);
                 }
             } catch (error) {
                 removeTypingIndicator();
-                addBotMessage("There was an error processing your request.");
+                // Display the specific error message from the backend
+                addBotMessage(`Error: ${error.message}`);
                 console.error("Error:", error);
             }
         }
 
-        // Event listeners
         sendButton.addEventListener('click', sendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -289,11 +286,10 @@
             }
         });
         
-        // Start the bot's animations on load
         window.onload = () => {
             setBotState('idle');
             randomBlink();
-            setInterval(changeExpression, 5000); // Change expression every 5 seconds
+            setInterval(changeExpression, 5000);
         };
 
     </script>
