@@ -6,7 +6,7 @@ const fetch = require('node-fetch');
 exports.handler = async function(event, context) {
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
+        return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
     }
 
     try {
@@ -20,7 +20,7 @@ exports.handler = async function(event, context) {
             // Return a specific error if the key is missing
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: 'GEMINI_API_KEY is not set in the Netlify environment variables. Please check your site configuration on Netlify.' }),
+                body: JSON.stringify({ error: 'API key is missing. Please check your Netlify environment variables.' }),
             };
         }
 
@@ -39,19 +39,21 @@ exports.handler = async function(event, context) {
             body: JSON.stringify(payload),
         });
 
-        const data = await response.json();
+        // Always try to get the JSON body, even if the request failed,
+        // as it might contain a specific error message from Google.
+        const responseData = await response.json();
 
         if (!response.ok) {
-            // If Google's API returns an error, pass it back to the frontend
-            const errorText = data?.error?.message || 'An unknown error occurred with the Gemini API.';
-            throw new Error(errorText);
+            // If the response is not OK, throw an error with the message from the API
+            const errorMessage = responseData?.error?.message || 'An unknown error occurred with the Gemini API.';
+            throw new Error(errorMessage);
         }
 
-        // Extract the text from the response
-        const botResponseText = data.candidates[0]?.content?.parts[0]?.text;
+        const botResponseText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (!botResponseText) {
-            throw new Error("The API returned a valid response, but it contained no text.");
+            // This handles cases where the API gives a 200 OK response but no content (e.g., due to safety filters)
+            throw new Error("The API returned a response with no text. This might be due to the prompt being blocked for safety reasons.");
         }
 
         // Send the extracted text back to the frontend
@@ -61,11 +63,12 @@ exports.handler = async function(event, context) {
         };
 
     } catch (error) {
-        console.error('Error in serverless function:', error.message);
-        // Return the actual error message for easier debugging
+        console.error('Error in serverless function:', error);
+        // Ensure the error message is always a string and send it back as JSON
+        const errorMessage = error.message || "An unknown server error occurred.";
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: error.message }),
+            body: JSON.stringify({ error: errorMessage }),
         };
     }
 };
